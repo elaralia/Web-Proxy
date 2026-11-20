@@ -57,8 +57,8 @@ echo "Next: point your web server (nginx / Apache / Caddy) at it with HTTPS. See
 if [[ "$(uname -m)" == aarch64 || "$(uname -m)" == arm* ]] && ! grep -m1 -E '^Features' /proc/cpuinfo | grep -qw aes; then
   echo
   echo "TIP: this CPU has no AES instructions (Raspberry Pi 4 or older)."
-  echo "     Uncomment the ChaCha20 lines in deploy/nginx.conf or deploy/apache.conf to cut"
-  echo "     HTTPS CPU use (Caddy does this automatically). Compare on this Pi with:"
+  echo "     Make HTTPS use ChaCha20 to cut its CPU use several times over: see"
+  echo "     'Make HTTPS use ChaCha20' in README.md (Caddy does it automatically). Compare with:"
   echo "       openssl speed -seconds 2 -bytes 16384 -evp aes-128-gcm"
   echo "       openssl speed -seconds 2 -bytes 16384 -evp chacha20-poly1305"
 fi
