@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import { server as wisp, logging } from "@mercuryworkshop/wisp-js/server";
+import { handleWisp } from "./relay.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 loadDotEnv(join(root, ".env"));
@@ -128,8 +129,7 @@ const fastify = Fastify({
           socket.end("HTTP/1.1 403 Forbidden\r\n\r\n");
           return;
         }
-        // Ping every 20s so school/office proxies don't drop the "idle" WebSocket.
-        wisp.routeRequest(req, socket, head, { ping_interval: 20 });
+        handleWisp(req, socket, head);
       }),
 });
 

@@ -51,3 +51,14 @@ PORT="$(grep -E '^PORT=' "$DIR/.env" | cut -d= -f2)"
 echo
 echo "Done. Web-Proxy is running on port ${PORT:-8080}."
 echo "Next: point your web server (nginx / Apache / Caddy) at it with HTTPS. See README.md."
+
+# HTTPS encryption is the biggest CPU cost on the Pi. Without AES instructions
+# (Pi 4 and older), ChaCha20 is much cheaper than the default AES-GCM.
+if [[ "$(uname -m)" == aarch64 || "$(uname -m)" == arm* ]] && ! grep -m1 -E '^Features' /proc/cpuinfo | grep -qw aes; then
+  echo
+  echo "TIP: this CPU has no AES instructions (Raspberry Pi 4 or older)."
+  echo "     Uncomment the ChaCha20 lines in deploy/nginx.conf or deploy/apache.conf to cut"
+  echo "     HTTPS CPU use (Caddy does this automatically). Compare on this Pi with:"
+  echo "       openssl speed -seconds 2 -bytes 16384 -evp aes-128-gcm"
+  echo "       openssl speed -seconds 2 -bytes 16384 -evp chacha20-poly1305"
+fi

@@ -1,6 +1,8 @@
 # Easiest option if you don't have a web server yet: Caddy gets and renews the
 # HTTPS certificate automatically. Install: sudo apt install caddy
 # Put this in /etc/caddy/Caddyfile and run: sudo systemctl reload caddy
+# Caddy automatically picks the cheapest encryption for the Pi's CPU (ChaCha20 on a
+# Pi 4 / 3, AES on a Pi 5), so there's nothing to tune here.
 proxy.example.com {
     reverse_proxy 127.0.0.1:8080 {
         flush_interval -1

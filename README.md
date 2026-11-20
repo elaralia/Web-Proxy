@@ -25,7 +25,7 @@ Web-Proxy works the other way round:
 * **Proxied files are cached in your browser.** Scripts, stylesheets, images and fonts are kept (already rewritten) for as long as each site allows. Going back to a site doesn't re-download them through the Pi or rewrite them again.
 * The proxy's own files are **pre-compressed with Brotli at install time** and cached by the browser permanently. After the first visit (about 900 KB), opening the proxy costs a single tiny request.
 
-The limit is now your home internet **upload** speed, because every byte you view passes through the Pi. On a typical home connection that's enough for 720p–1080p YouTube.
+What's left for the Pi is small: relaying bytes, and the HTTPS encryption your web server (Apache/nginx/Caddy) does. The relay is tuned for a Pi's limited RAM and CPU (see [Performance notes](#performance-notes)). On a Pi 4 or older, also see the HTTPS tip below.
 
 ## What's included
 
@@ -70,6 +70,8 @@ Browsers only allow service workers on `https://` sites, and the proxy relies on
 
 For Apache or nginx, `sudo certbot --apache -d your.domain` (or `--nginx`) gets a free Let's Encrypt certificate.
 
+**Pi 4 / Pi 3 tip:** HTTPS encryption is the largest CPU cost on the Pi. These models have no AES instructions, so the default AES-GCM encryption is slow on them. Uncomment the ChaCha20 lines in `apache.conf` or `nginx.conf` to make the server prefer ChaCha20, which is built for CPUs like this. `install.sh` tells you whether your Pi needs it. Caddy does this automatically, and a Pi 5 doesn't need it.
+
 > Use the **same domain** that already works on the restricted network. Web-Proxy must be served from the root of the site (`https://your.domain/`), not a sub-folder.
 
 Then open `https://your.domain/`, sign in, and browse.
@@ -82,7 +84,7 @@ PHP-Proxy hides the target address with plain base64, which anyone (or any filte
 https://your.domain/s/kJoUIqHzMWgjm6kutkaa48DotPNd8GOCmPPYpQKKQps
 ```
 
-Decoding that as base64 gives gibberish. You need your key to read it. Other things that could give the proxy away are hidden too:
+Decoding that as base64 gives gibberish. You need your key to read it. These `/s/…` addresses are also handled entirely inside your browser by the service worker, so they never cross the network. The network only sees `your.domain`, the `/assets/…` files and one encrypted WebSocket. Other things that could give the proxy away are hidden too:
 
 * Paths are short and generic: `/s/…` (Scramjet), `/u/…` (Ultraviolet) and `/assets/<hash>.js` for every script. Library names like "scramjet" or "uv.bundle.js" never appear.
 * Without signing in, nobody can download the proxy scripts or the file that contains your key. Only the login page is public.
@@ -137,7 +139,8 @@ Files in `public/` are templates: after editing them, run `npm run build` (or `n
 Layout:
 
 ```
-src/server.js        Fastify server: static files, login, Wisp WebSocket relay
+src/server.js        Fastify server: static files, login, WebSocket upgrade
+src/relay.js         Wisp relay tuned for low RAM/CPU (flow control, single-copy data path)
 public/index.html    Browser UI (tabs, toolbar, home page, settings)
 public/app.js        UI logic, tab management, Scramjet/UV/bare-mux setup
 public/sw.js         Service worker: runs Scramjet + Ultraviolet, response cache
@@ -149,11 +152,13 @@ deploy/              systemd unit, install script, nginx/Apache/Caddy configs
 
 ### Performance notes
 
-Measured with headless Chromium against a local test site on a fast VM. A Pi 4 is roughly 3–5× slower on server CPU:
+Measured on a fast VM with headless Chromium and a Wisp test client against local test sites. A Pi 4 is roughly 3–5× slower on CPU:
 
 | | Result |
 |---|---|
-| Pi CPU to relay 100 MB | ~0.35 s (a Pi 4 can relay far more than a home upload link) |
+| Pi CPU to relay 100 MB | ~0.1 s, about 27% less than stock wisp-js. The relay builds each packet with one copy instead of two. |
+| Pi RAM, slow client downloading 3 files at once | **~110 MB peak** (stock wisp-js: 237 MB). A full buffer pauses the website's connection instead of storing more. |
+| Large download when the website closes the connection | Complete (stock wisp-js delivered only 38 of 100 MB on a slow link) |
 | Wisp protocol overhead | 0.02% |
 | Return visit to a page with 1.5 MB of JS, after a browser restart | 1524 KB → **1 KB** through the Pi, 35–60% faster |
 | Opening the proxy again | 1 KB (everything else is cached permanently) |
