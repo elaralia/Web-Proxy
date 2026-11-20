@@ -185,7 +185,7 @@ fastify.register(fastifyStatic, {
   cacheControl: false,
   index: ["index.html"],
   setHeaders(reply, path) {
-    if (path.includes("/assets/")) {
+    if (/[\\/]assets[\\/]/.test(path)) { // file path: "/" on Linux, "\\" on Windows
       reply.header("Cache-Control", "public, max-age=31536000, immutable");
     } else {
       reply.header("Cache-Control", "no-cache");
