@@ -1,0 +1,24 @@
+# systemd unit for Web-Proxy. install.sh fills in User and WorkingDirectory.
+[Unit]
+Description=Web-Proxy (Scramjet/Ultraviolet web proxy)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__DIR__
+ExecStart=/usr/bin/env node src/server.js
+Restart=always
+RestartSec=3
+Environment=NODE_ENV=production
+# Keep memory use modest on small Pis.
+Environment=NODE_OPTIONS=--max-old-space-size=256
+# More threads for DNS lookups (getaddrinfo) when many sites load at once.
+Environment=UV_THREADPOOL_SIZE=16
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

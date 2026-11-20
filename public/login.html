@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sign in – Web Proxy</title>
+    <link rel="icon" href="{{favicon.svg}}" type="image/svg+xml" />
+    <link rel="stylesheet" href="{{style.css}}" />
+  </head>
+  <body class="simple">
+    <form id="login" class="card">
+      <h1>Web Proxy</h1>
+      <input id="password" type="password" placeholder="Password" autocomplete="current-password" autofocus required />
+      <button class="primary" type="submit">Sign in</button>
+      <p id="error" class="error" hidden></p>
+    </form>
+    <script>
+      document.getElementById("login").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const error = document.getElementById("error");
+        error.hidden = true;
+        try {
+          const res = await fetch("/api/login", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ password: document.getElementById("password").value }),
+          });
+          const data = await res.json();
+          if (data.ok) return (location.href = "/");
+          error.textContent = data.error || "Sign in failed.";
+        } catch (err) {
+          error.textContent = "Couldn't reach the server.";
+        }
+        error.hidden = false;
+      });
+    </script>
+  </body>
+</html>
