@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Web Proxy</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/scram/scramjet.all.js"></script>
+    <script src="/uv/uv.bundle.js"></script>
+    <script src="/uv.config.js"></script>
+    <script src="/baremux/index.js"></script>
+    <script src="/app.js" defer></script>
+  </head>
+  <body class="browser">
+    <header class="chrome">
+      <div class="tabbar">
+        <div id="tabs" class="tabs" role="tablist"></div>
+        <button id="new-tab" class="icon-btn" title="New tab" aria-label="New tab">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
+        </button>
+      </div>
+      <div class="toolbar">
+        <button id="back" class="icon-btn" title="Back" aria-label="Back">
+          <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /></svg>
+        </button>
+        <button id="forward" class="icon-btn" title="Forward" aria-label="Forward">
+          <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
+        </button>
+        <button id="reload" class="icon-btn" title="Reload" aria-label="Reload">
+          <svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" /></svg>
+        </button>
+        <button id="home" class="icon-btn" title="Home" aria-label="Home">
+          <svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" /></svg>
+        </button>
+        <form id="address-form" class="address">
+          <span id="engine-badge" class="badge" title="Proxy engine for this tab"></span>
+          <input id="address" type="text" autocomplete="off" spellcheck="false" placeholder="Search or enter address" />
+        </form>
+        <button id="fullscreen" class="icon-btn" title="Fullscreen page" aria-label="Fullscreen page">
+          <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+        </button>
+        <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>
+        </button>
+      </div>
+      <div id="progress" class="progress"></div>
+    </header>
+
+    <main id="viewport" class="viewport">
+      <section id="home-page" class="home" hidden>
+        <div class="home-inner">
+          <h1 class="logo">Web Proxy</h1>
+          <form id="home-form" class="home-search">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></svg>
+            <input id="home-input" type="text" autocomplete="off" spellcheck="false" placeholder="Search the web or type a URL" />
+          </form>
+          <div id="shortcuts" class="shortcuts"></div>
+          <p id="home-error" class="error" hidden></p>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="settings" class="settings">
+      <form method="dialog">
+        <h2>Settings</h2>
+        <label>
+          <span>Proxy engine</span>
+          <select id="set-engine">
+            <option value="scramjet">Scramjet (recommended, best site support)</option>
+            <option value="uv">Ultraviolet (fallback if a site breaks)</option>
+          </select>
+        </label>
+        <label>
+          <span>Transport</span>
+          <select id="set-transport">
+            <option value="epoxy">Epoxy (fastest)</option>
+            <option value="libcurl">libcurl (most compatible)</option>
+          </select>
+        </label>
+        <label>
+          <span>Search engine</span>
+          <select id="set-search">
+            <option value="https://duckduckgo.com/?q=%s">DuckDuckGo</option>
+            <option value="https://www.google.com/search?q=%s">Google</option>
+            <option value="https://www.bing.com/search?q=%s">Bing</option>
+            <option value="https://search.brave.com/search?q=%s">Brave</option>
+          </select>
+        </label>
+        <label class="check">
+          <input id="set-restore" type="checkbox" />
+          <span>Reopen my tabs next time</span>
+        </label>
+        <p class="hint">
+          Engine and transport changes apply to newly opened pages. If a site doesn't work, try
+          switching the engine, then reload.
+        </p>
+        <div class="dialog-actions">
+          <button type="button" id="clear-data" class="secondary">Clear site data</button>
+          <button type="button" id="logout" class="secondary" hidden>Log out</button>
+          <button value="close" class="primary">Done</button>
+        </div>
+      </form>
+    </dialog>
+  </body>
+</html>

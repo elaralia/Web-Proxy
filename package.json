@@ -1,0 +1,26 @@
+{
+  "name": "web-proxy",
+  "version": "1.0.0",
+  "description": "Fast, modern web proxy for low-power hosts (Raspberry Pi). Scramjet + Ultraviolet over Wisp.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "node scripts/build.js",
+    "postinstall": "node scripts/build.js",
+    "start": "node src/server.js"
+  },
+  "license": "AGPL-3.0-or-later",
+  "dependencies": {
+    "@fastify/static": "^10.1.12",
+    "@mercuryworkshop/bare-mux": "^2.1.9",
+    "@mercuryworkshop/epoxy-transport": "^2.1.29",
+    "@mercuryworkshop/libcurl-transport": "^1.5.2",
+    "@mercuryworkshop/scramjet": "1.1.0",
+    "@mercuryworkshop/wisp-js": "^0.5.3",
+    "@titaniumnetwork-dev/ultraviolet": "^3.2.10",
+    "fastify": "^5.12.8"
+  }
+}

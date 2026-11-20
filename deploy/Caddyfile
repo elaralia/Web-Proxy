@@ -1,0 +1,8 @@
+# Easiest option if you don't have a web server yet: Caddy gets and renews the
+# HTTPS certificate automatically. Install: sudo apt install caddy
+# Put this in /etc/caddy/Caddyfile and run: sudo systemctl reload caddy
+proxy.example.com {
+    reverse_proxy 127.0.0.1:8080 {
+        flush_interval -1
+    }
+}
