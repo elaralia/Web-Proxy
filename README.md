@@ -25,7 +25,7 @@ Web-Proxy works the other way round:
 * **Proxied files are cached in your browser.** Scripts, stylesheets, images and fonts are kept (already rewritten) for as long as each site allows. Going back to a site doesn't re-download them through the Pi or rewrite them again.
 * The proxy's own files are **pre-compressed with Brotli at install time** and cached by the browser permanently. After the first visit (about 900 KB), opening the proxy costs a single tiny request.
 
-What's left for the Pi is small: relaying bytes, and the HTTPS encryption your web server (Apache/nginx/Caddy) does. The relay is tuned for a Pi's limited RAM and CPU (see [Performance notes](#performance-notes)). On a Pi 4 or older, also see the HTTPS tip below.
+What's left for the Pi is small: relaying bytes, and the HTTPS encryption your web server (Apache/nginx/Caddy) does. The relay is tuned for a Pi's limited RAM and CPU (see [Performance notes](#performance-notes)). On a Pi 4 or older, also do [step 4](#4-pi-4-or-older-make-https-use-chacha20).
 
 ## What's included
 
@@ -70,11 +70,46 @@ Browsers only allow service workers on `https://` sites, and the proxy relies on
 
 For Apache or nginx, `sudo certbot --apache -d your.domain` (or `--nginx`) gets a free Let's Encrypt certificate.
 
-**Pi 4 / Pi 3 tip:** HTTPS encryption is the largest CPU cost on the Pi. These models have no AES instructions, so the default AES-GCM encryption is slow on them. Uncomment the ChaCha20 lines in `apache.conf` or `nginx.conf` to make the server prefer ChaCha20, which is built for CPUs like this. `install.sh` tells you whether your Pi needs it. Caddy does this automatically, and a Pi 5 doesn't need it.
-
 > Use the **same domain** that already works on the restricted network. Web-Proxy must be served from the root of the site (`https://your.domain/`), not a sub-folder.
 
 Then open `https://your.domain/`, sign in, and browse.
+
+### 4. Pi 4 or older: make HTTPS use ChaCha20
+
+**This is the biggest CPU saving available on these Pis.** Every byte the proxy sends you is HTTPS-encrypted on the Pi by your web server, and that costs more CPU than the proxy itself. Raspberry Pis before the Pi 5 have no AES instructions, so the default cipher, AES-GCM, is very slow on them. ChaCha20-Poly1305 is designed for CPUs without AES hardware. Measured on this project's Pi (one CPU core):
+
+| Cipher | Encryption speed |
+|---|---|
+| AES-128-GCM (the default) | 13 MB/s |
+| ChaCha20-Poly1305 | **93 MB/s (7× faster)** |
+
+So the same traffic costs about a seventh of the CPU. Every browser supports both. Laptops ask for AES first only because *their* CPUs have AES hardware, so the server has to insist on ChaCha20. `install.sh` tells you whether your Pi lacks AES. To measure it yourself:
+
+```bash
+openssl speed -seconds 2 -bytes 16384 -evp aes-128-gcm
+openssl speed -seconds 2 -bytes 16384 -evp chacha20-poly1305
+```
+
+Do the part that matches your web server, then reload it:
+
+* **Apache**: uncomment the three ChaCha20 lines (`SSLHonorCipherOrder`, `SSLCipherSuite` ×2) in [`deploy/apache.conf`](deploy/apache.conf). If certbot added an `Include` line, put them below it.
+* **nginx 1.19.4 or newer** (`nginx -v`): uncomment the three ChaCha20 lines in [`deploy/nginx.conf`](deploy/nginx.conf).
+* **nginx 1.18**: this is what Raspberry Pi OS 11 "bullseye" ships. If `openssl version` says 1.1.1, you're probably on it. nginx 1.18 doesn't know `ssl_conf_command` and won't start with that line, so uncomment only `ssl_prefer_server_ciphers` and `ssl_ciphers`. Then set the TLS 1.3 order with the included OpenSSL file, which only nginx uses:
+  ```bash
+  sudo cp deploy/openssl-chacha.cnf /etc/nginx/
+  sudo mkdir -p /etc/systemd/system/nginx.service.d
+  printf '[Service]\nEnvironment=OPENSSL_CONF=/etc/nginx/openssl-chacha.cnf\n' | sudo tee /etc/systemd/system/nginx.service.d/chacha.conf
+  sudo systemctl daemon-reload && sudo systemctl restart nginx
+  ```
+* **Caddy**: nothing to do. It picks ChaCha20 automatically on CPUs without AES.
+
+Check that it worked by running this on the Pi. The client deliberately asks for AES first, like a laptop browser:
+
+```bash
+echo | openssl s_client -connect your.domain:443 -tls1_3 -ciphersuites TLS_AES_128_GCM_SHA256:TLS_CHACHA20_POLY1305_SHA256 2>/dev/null | grep "Cipher is"
+```
+
+It should print `TLS_CHACHA20_POLY1305_SHA256`. Each of these setups was tested with nginx, Apache and Chromium, and all of them negotiated ChaCha20 even though the browser preferred AES.
 
 ## Hidden URLs
 
@@ -147,7 +182,8 @@ public/sw.js         Service worker: runs Scramjet + Ultraviolet, response cache
 public/config.js     Template for the shared config (URL codec, asset paths)
 public/uv.config.js  Template for Ultraviolet's config
 scripts/build.js     Builds build/www: hashed assets, codec key, templates, brotli/gzip
-deploy/              systemd unit, install script, nginx/Apache/Caddy configs
+deploy/              systemd unit, install script, nginx/Apache/Caddy configs,
+                     openssl-chacha.cnf (ChaCha20 for nginx 1.18)
 ```
 
 ### Performance notes
