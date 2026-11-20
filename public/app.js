@@ -1,4 +1,4 @@
-/* global BareMux, $scramjetLoadController, __uv$config */
+/* global BareMux, $scramjetLoadController, __wp$config */
 "use strict";
 
 // ---------------------------------------------------------------------------
@@ -42,22 +42,25 @@ const settings = {
 // ---------------------------------------------------------------------------
 // Proxy setup
 // ---------------------------------------------------------------------------
+const cfg = __wp$config;
 const { ScramjetController } = $scramjetLoadController();
 const scramjet = new ScramjetController({
-  prefix: "/scramjet/",
+  prefix: cfg.sjPrefix,
   files: {
-    wasm: "/scram/scramjet.wasm.wasm",
-    all: "/scram/scramjet.all.js",
-    sync: "/scram/scramjet.sync.js",
+    wasm: cfg.files.scramjetWasm,
+    all: cfg.files.scramjetAll,
+    sync: cfg.files.scramjetSync,
   },
+  // Keyed codec: the real address never appears in the URL.
+  codec: { encode: cfg.encode, decode: cfg.decode },
   flags: { interceptDownloads: true },
 });
 const scramjetReady = scramjet.init();
-const connection = new BareMux.BareMuxConnection("/baremux/worker.js");
+const connection = new BareMux.BareMuxConnection(cfg.files.baremuxWorker);
 
 const TRANSPORTS = {
-  epoxy: "/epoxy/index.mjs",
-  libcurl: "/libcurl/index.mjs",
+  epoxy: cfg.files.epoxy,
+  libcurl: cfg.files.libcurl,
 };
 
 let setupPromise = null;
@@ -92,7 +95,7 @@ async function applyTransport() {
 }
 
 function encodeProxyUrl(url, engine) {
-  if (engine === "uv") return __uv$config.prefix + __uv$config.encodeUrl(url);
+  if (engine === "uv") return cfg.uvPrefix + cfg.encode(url);
   return scramjet.encodeUrl(url);
 }
 
@@ -100,10 +103,8 @@ function decodeProxyUrl(href) {
   try {
     const u = new URL(href);
     if (u.origin !== location.origin) return null;
-    if (u.pathname.startsWith(__uv$config.prefix)) {
-      return __uv$config.decodeUrl(u.pathname.slice(__uv$config.prefix.length)) + "";
-    }
-    if (u.pathname.startsWith("/scramjet/")) return scramjet.decodeUrl(href);
+    if (u.pathname.startsWith(cfg.uvPrefix)) return cfg.decode(u.pathname.slice(cfg.uvPrefix.length) + u.search);
+    if (u.pathname.startsWith(cfg.sjPrefix)) return scramjet.decodeUrl(href);
   } catch {
     /* ignore */
   }
@@ -375,7 +376,7 @@ function showError(msg) {
 
 // Keep title/URL fresh for pages that change them without a navigation (SPAs).
 setInterval(() => {
-  if (active && active.url && active.iframe) updateFromFrame(active);
+  if (!document.hidden && active && active.url && active.iframe) updateFromFrame(active);
 }, 1000);
 
 // ---------------------------------------------------------------------------
@@ -571,14 +572,8 @@ scramjet.addEventListener("download", async (e) => {
 // Start
 // ---------------------------------------------------------------------------
 renderShortcuts();
-const params = new URLSearchParams(location.search);
-const initial = params.get("url");
 const restored = settings.restore ? store.get("tabs", []) : [];
-if (initial) {
-  history.replaceState(null, "", "/");
-  restored.forEach((u) => createTab(u, { activate: false, lazy: true }));
-  createTab(toUrl(initial));
-} else if (restored.length) {
+if (restored.length) {
   restored.forEach((u, i) => createTab(u, { activate: i === 0, lazy: true }));
 } else {
   createTab();

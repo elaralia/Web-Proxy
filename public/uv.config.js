@@ -1,11 +1,11 @@
-/* global Ultraviolet */
+// Generated at build time (see scripts/build.js).
 self.__uv$config = {
-  prefix: "/uv/service/",
-  encodeUrl: Ultraviolet.codec.xor.encode,
-  decodeUrl: Ultraviolet.codec.xor.decode,
-  handler: "/uv/uv.handler.js",
-  client: "/uv/uv.client.js",
-  bundle: "/uv/uv.bundle.js",
-  config: "/uv.config.js",
-  sw: "/uv/uv.sw.js",
+  prefix: "{{UV_PREFIX}}",
+  encodeUrl: {{CODEC_ENCODE}},
+  decodeUrl: {{CODEC_DECODE}},
+  handler: "{{uv.handler.js}}",
+  client: "{{uv.client.js}}",
+  bundle: "{{uv.bundle.js}}",
+  config: "{{uv.config.js}}",
+  sw: "{{uv.sw.js}}",
 };

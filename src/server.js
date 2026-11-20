@@ -31,9 +31,9 @@ const config = {
   logLevel: (process.env.LOG_LEVEL || "info").toLowerCase(),
 };
 
-const libDir = join(root, "build", "lib");
-if (!existsSync(libDir)) {
-  console.error("build/lib is missing. Run `npm run build` (it normally runs automatically after `npm install`).");
+const wwwDir = join(root, "build", "www");
+if (!existsSync(join(wwwDir, "index.html"))) {
+  console.error("build/www is missing. Run `npm run build` (it normally runs automatically after `npm install`).");
   process.exit(1);
 }
 
@@ -48,7 +48,11 @@ Object.assign(wisp.options, {
   allow_private_ips: config.allowLocalNetwork, // by default never let the proxy reach your home LAN
   allow_loopback_ips: config.allowLocalNetwork, // ...or the Pi itself
   hostname_blacklist: config.blocklist.length ? config.blocklist.map((h) => new RegExp(h, "i")) : null,
-  ...(config.dnsServers.length ? { dns_method: "resolve", dns_servers: config.dnsServers } : {}),
+  // Custom DNS uses c-ares directly. Prefer IPv4: many home networks have no working IPv6
+  // and wisp-js would otherwise try AAAA records first.
+  ...(config.dnsServers.length
+    ? { dns_method: "resolve", dns_servers: config.dnsServers, dns_result_order: "ipv4first" }
+    : {}),
 });
 
 // ---------------------------------------------------------------------------
@@ -80,7 +84,16 @@ function isAuthed(cookieHeader) {
   return !!c && safeEqual(c, sessionToken);
 }
 
-const PUBLIC_PATHS = new Set(["/login", "/login.html", "/style.css", "/favicon.svg", "/api/login"]);
+// Only what the login page itself needs is reachable without signing in. In
+// particular the proxy libraries and the URL codec key stay private.
+const manifest = JSON.parse(readFileSync(join(root, "build", "manifest.json"), "utf8"));
+const PUBLIC_PATHS = new Set([
+  "/login",
+  "/login.html",
+  "/api/login",
+  manifest.assets["style.css"],
+  manifest.assets["favicon.svg"],
+]);
 
 // Simple brute-force protection: 10 failed logins per IP per 15 minutes.
 const failures = new Map();
@@ -115,7 +128,8 @@ const fastify = Fastify({
           socket.end("HTTP/1.1 403 Forbidden\r\n\r\n");
           return;
         }
-        wisp.routeRequest(req, socket, head);
+        // Ping every 20s so school/office proxies don't drop the "idle" WebSocket.
+        wisp.routeRequest(req, socket, head, { ping_interval: 20 });
       }),
 });
 
@@ -160,29 +174,26 @@ fastify.post("/api/logout", async (req, reply) => {
 
 fastify.get("/api/info", async () => ({ auth: !!sessionToken }));
 
-// Front-end (small, changes when you edit it -> short cache).
+// Everything the browser loads comes from build/www (see scripts/build.js):
+//  - /assets/<hash>.*  content-hashed -> cached forever, never revalidated
+//  - pages + sw.js     fixed names    -> always revalidated (cheap 304s)
+// All of it is served pre-compressed (brotli/gzip), so the Pi does no compression work.
 fastify.register(fastifyStatic, {
-  root: join(root, "public"),
+  root: wwwDir,
   decorateReply: true,
-  cacheControl: true,
-  maxAge: 0,
+  preCompressed: true,
+  cacheControl: false,
+  index: ["index.html"],
   setHeaders(reply, path) {
+    if (path.includes("/assets/")) {
+      reply.header("Cache-Control", "public, max-age=31536000, immutable");
+    } else {
+      reply.header("Cache-Control", "no-cache");
+    }
     // The service worker must be allowed to control the whole origin.
     if (path.endsWith("sw.js")) reply.header("Service-Worker-Allowed", "/");
   },
 });
-
-// Proxy libraries (large, versioned by npm -> cache for a day, served pre-compressed).
-for (const name of ["scram", "uv", "baremux", "libcurl", "epoxy"]) {
-  fastify.register(fastifyStatic, {
-    root: join(libDir, name),
-    prefix: `/${name}/`,
-    decorateReply: false,
-    preCompressed: true,
-    cacheControl: true,
-    maxAge: "1d",
-  });
-}
 
 fastify.setNotFoundHandler((req, reply) => {
   reply.code(404).type("text/html").sendFile("404.html");
